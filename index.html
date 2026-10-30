@@ -2630,7 +2630,7 @@ setInterval(hudTick,300);
 const sc=document.querySelector('a-scene'),cam=$('main-cam'),rig=$('vr-rig'),hL=$('hand-l'),hR=$('hand-r'),TH=AFRAME.THREE;
 const PX=2400,AC='#5eead4',FONT="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Roboto,Arial,sans-serif";
 const VRUI={on:false,open:true,info:true,tab:'act',btns:[],dyn:[],lConn:false,built:false,i:null};
-let vrRoot,vrOrb,vrSb,encTex=TH.LinearEncoding,dmLast='',vi=0;
+const WT={tilt:-65,s:.7};let vrRoot,vrOrb,vrSb,encTex=TH.LinearEncoding,dmLast='',vi=0;
 const _adm=appendDMMessage;appendDMMessage=function(h){dmLast=lastMsg=String(h).replace(/<[^>]*>/g,'').replace(/&[#\w]+;/g,' ');msgAt=Date.now();_adm(h);};
 const _tst=toast;toast=function(i,t,d){lastMsg=((t||'')+(d?' · '+d:'')).trim();msgAt=Date.now();return _tst.apply(this,arguments);};
 AFRAME.registerComponent('vr-billboard',{init(){this.v=new TH.Vector3();},tick(){const o=this.el.object3D;if(!o.visible)return;cam.object3D.getWorldPosition(this.v);o.lookAt(this.v);}});
@@ -2671,14 +2671,15 @@ function syncClickable(){VRUI.btns.forEach(o=>o.el.classList.toggle('clickable',
 function setOpen(v){VRUI.open=v;if(!VRUI.built)return;vrRoot.object3D.visible=VRUI.on&&v;vrOrb.object3D.visible=VRUI.on&&!v;syncClickable();paintAll(true);}
 function toggleInfo(){VRUI.info=!VRUI.info;if(VRUI.built)vrSb.object3D.visible=VRUI.on&&VRUI.info;paintAll(true);}
 const G={};function setTab(k){VRUI.tab=k;Object.keys(G).forEach(t=>G[t].object3D.visible=t===k);syncClickable();paintAll(true);}
-function nudge(d){const p=rig.getAttribute('position');rig.setAttribute('position',{x:p.x,y:p.y+d,z:p.z});}
+function nudge(d){rig.object3D.position.y+=d;}
+function applyWT(){const r=TH.MathUtils.degToRad(WT.tilt);vrRoot.object3D.rotation.x=r;vrOrb.object3D.rotation.x=r;vrRoot.object3D.scale.setScalar(WT.s);}
 function summonNext(){const P=state.palette;if(!P.length)return;const picked=i=>P[i].role!=='Monstruo'&&Object.values(state.board).some(u=>!u.isProp&&u.paletteIdx===i);
  for(let k=0;k<P.length;k++){const i=(vi+k)%P.length;if(!picked(i)){vi=(i+1)%P.length;state.selection={type:'palette',card:P[i],idx:i};renderPalette();updateTutorialPhase();emit('palette_select');toast('🧙',P[i].name,'Apunta a una casilla y gatillo');return;}}
  toast('✅','Todo invocado','No quedan miniaturas.');}
 function build(){
  try{encTex=sc.renderer&&sc.renderer.outputEncoding===TH.sRGBEncoding?TH.sRGBEncoding:TH.LinearEncoding;}catch(e){}
  const W=.32,H=.394,noSel=()=>!curSel(),dis=id=>()=>{const b=$(id);return !b||b.disabled;},A=a=>()=>triggerAction(a);
- vrRoot=createEEl('a-entity',{position:'0 .07 .02'});vrRoot.setAttribute('vr-billboard','');hL.appendChild(vrRoot);
+ vrRoot=createEEl('a-entity',{position:'0 .05 .06',rotation:`${WT.tilt} 0 0`,scale:`${WT.s} ${WT.s} ${WT.s}`});hL.appendChild(vrRoot);
  widget(vrRoot,0,H/2,W,H,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(10,28,38,.92)');gr.addColorStop(1,'rgba(5,16,24,.92)');rr(g,4,4,w-8,h-8,48);g.fillStyle=gr;g.fill();g.lineWidth=6;g.strokeStyle='rgba(94,234,212,.6)';g.stroke();},null,0,20);
  const status=()=>{const s=curSel(),inC=state.currentTurnIdx!==-1,u=state.initiative&&state.initiative[state.currentTurnIdx];return{s,inC,tn:u?u.name:'',r:recent()};};
  widget(vrRoot,-.0295,.3585,.245,.055,(g,w,h)=>{const q=status(),s=q.s;rr(g,3,3,w-6,h-6,22);g.fillStyle='rgba(2,10,15,.8)';g.fill();g.lineWidth=3;g.strokeStyle='rgba(94,234,212,.3)';g.stroke();g.textBaseline='middle';g.textAlign='left';
@@ -2697,16 +2698,16 @@ function build(){
   {ico:'🎲',lab:'D20 libre',col:'#fbbf24',fn:A('ACCIÓN LIBRE'),dis:dis('btn-free')},{ico:'↷',lab:'Girar',fn:()=>rotateUnit(90),dis:noSel},{ico:'✖️',lab:'Cancelar',col:'#94a3b8',fn:()=>clearSelection()}],
  mesa:[{ico:'🧙',lab:'Invocar',col:'#c084fc',fn:summonNext},{ico:'🗝️',lab:'Cofre',col:'#fbbf24',fn:()=>openChest()},{ico:'🗑️',lab:'Eliminar',col:'#f87171',fn:()=>removeSelectedEntity(),dis:()=>!state.selection||state.selection.type!=='board'},
   {ico:'↶',lab:'Girar',fn:()=>rotateUnit(-90),dis:noSel},{ico:'🌲',lab:'Decorar',col:'#4ade80',fn:()=>randomizePropsOnBoard()},{ico:'🧹',lab:'Sin props',col:'#94a3b8',fn:()=>clearAllProps()},
-  {ico:'⬆️',lab:'Mesa arriba',fn:()=>nudge(-1)},{ico:'⬇️',lab:'Mesa abajo',fn:()=>nudge(1)},{ico:'🎯',lab:'Recentrar',fn:()=>rig.setAttribute('position','0 -8 24')}],
+  {ico:'⬆️',lab:'Mesa arriba',fn:()=>nudge(-1)},{ico:'⬇️',lab:'Mesa abajo',fn:()=>nudge(1)},{ico:'🎯',lab:'Recentrar',fn:()=>{rig.object3D.position.set(0,-8,24);rig.object3D.rotation.set(0,0,0);}}],
  dm:[{ico:'🔍',lab:'Investigar',fn:()=>quickSay('Investigo la zona con cuidado.')},{ico:'💬',lab:'Hablar',fn:()=>quickSay('Intento hablar con la criatura más cercana.')},{ico:'🚪',lab:'Explorar',fn:()=>quickSay('Exploro hacia adelante buscando una salida.')}],
- sys:[{ico:'🔊',lab:'Sonido',fn:()=>toggleMute()},{ico:'📊',lab:'Marcador',fn:toggleInfo,act:()=>VRUI.info},{ico:'🚪',lab:'Salir de VR',col:'#f87171',fn:()=>sc.exitVR()}]};
+ sys:[{ico:'🔊',lab:'Sonido',fn:()=>toggleMute()},{ico:'📊',lab:'Marcador',fn:toggleInfo,act:()=>VRUI.info},{ico:'🚪',lab:'Salir de VR',col:'#f87171',fn:()=>sc.exitVR()},{ico:'⌚',lab:'Inclinar',fn:()=>{WT.tilt=WT.tilt<=-90?-40:WT.tilt-25;applyWT();}},{ico:'🔎',lab:'Tamaño',fn:()=>{WT.s=WT.s>=.95?.5:+(WT.s+.15).toFixed(2);applyWT();}}]};
  TABS.forEach(([k])=>{G[k]=createEEl('a-entity',{});vrRoot.appendChild(G[k]);C[k].forEach((s,i)=>button(G[k],k,s,(i%3-1)*.104,.242-Math.floor(i/3)*.07,.096,.062));});
- const box=(k,txt)=>{const o=widget(G[k],0,.137,.304,.132,(g,w,h)=>{rr(g,3,3,w-6,h-6,26);g.fillStyle='rgba(2,10,15,.78)';g.fill();g.lineWidth=3;g.strokeStyle='rgba(94,234,212,.3)';g.stroke();g.font=`500 35px ${FONT}`;g.fillStyle='#e2e8f0';g.textAlign='left';g.textBaseline='top';
+ const box=(k,txt,by,bh)=>{const o=widget(G[k],0,by||.137,.304,bh||.132,(g,w,h)=>{rr(g,3,3,w-6,h-6,26);g.fillStyle='rgba(2,10,15,.78)';g.fill();g.lineWidth=3;g.strokeStyle='rgba(94,234,212,.3)';g.stroke();g.font=`500 35px ${FONT}`;g.fillStyle='#e2e8f0';g.textAlign='left';g.textBaseline='top';
   const L=wrap(g,txt(),w-44),mx=Math.floor((h-24)/46);L.slice(0,mx).forEach((l,i)=>g.fillText(i===mx-1&&L.length>mx?fit(g,l+' …',w-44):l,22,16+i*46));},()=>txt());o.tab=k;};
  box('dm',()=>dmLast||'Pulsa una acción y el Master (IA) responderá aquí.');
- box('sys',()=>'Y (izq.) o B (der.): abrir/cerrar este menú\nX (izq.): marcador de estado\nGatillo: elegir y confirmar\nApunta con el láser a una miniatura o casilla.');
+ box('sys',()=>'Y/B menú · X marcador · Gatillo elegir\nStick izq.: caminar · der.: girar y altura',.102,.062);
  button(vrRoot,null,{prim:true,ico:()=>state.currentTurnIdx===-1?'⚔️':'⏭️',lab:()=>state.currentTurnIdx===-1?'Combate':'Siguiente turno',fn:()=>state.currentTurnIdx===-1?startCombat():advanceTurn(),dis:()=>state.currentTurnIdx!==-1&&(state.aiBusy||state.busy),hint:'Espera: la IA está jugando su turno.'},0,.0355,.304,.055);
- vrOrb=createEEl('a-entity',{position:'0 .075 .02'});vrOrb.setAttribute('vr-billboard','');hL.appendChild(vrOrb);
+ vrOrb=createEEl('a-entity',{position:'0 .07 0',rotation:`${WT.tilt} 0 0`});hL.appendChild(vrOrb);
  const oi=createEEl('a-entity',{animation:'property: scale; from: 1 1 1; to: 1.12 1.12 1.12; dir: alternate; dur: 900; loop: true; easing: easeInOutSine'});vrOrb.appendChild(oi);
  const ob=button(oi,null,{ico:'',lab:'',fn:()=>setOpen(true),draw:(g,w,h,st)=>{const r=w/2-6,gr=g.createRadialGradient(w/2,h*.4,r*.1,w/2,h/2,r);gr.addColorStop(0,st.hot?'#99f6e4':'#2dd4bf');gr.addColorStop(1,'#0f766e');g.beginPath();g.arc(w/2,h/2,r,0,7);g.fillStyle=gr;g.fill();g.lineWidth=6;g.strokeStyle=st.hot?'#fff':'rgba(236,254,255,.85)';g.stroke();g.textAlign='center';g.textBaseline='middle';g.font=`${h*.46}px ${FONT}`;g.fillText('⚔️',w/2,h/2+4);}},0,0,.085,.085);ob.orb=true;
  vrSb=createEEl('a-entity',{position:'0 0 0'});sc.appendChild(vrSb);
@@ -2714,13 +2715,20 @@ function build(){
   g.font=`800 112px ${FONT}`;g.fillStyle='#f8fafc';g.fillText(fit(g,turnTxt(),w-140),w/2,h*.26);g.font=`700 82px ${FONT}`;g.fillStyle='#cbd5e1';g.fillText(`🛡️ Héroes ${i.H.length}/${i.mx.party}     👹 Monstruos ${i.M.length}/${i.mx.dm}     ⭐ ${state.score.party} · ${state.score.dm}`,w/2,h*.53);
   g.font=`500 70px ${FONT}`;g.fillStyle='#94a3b8';g.fillText(fit(g,recent()||i.o||'',w-140),w/2,h*.79);},
   ()=>{const i=VRUI.i||{};return [turnTxt(),i.H&&i.H.length,i.M&&i.M.length,i.mx&&i.mx.party,i.mx&&i.mx.dm,state.score.party,state.score.dm,recent(),i.o].join('|');},-26,20,80);sb.sb=true;
- hL.setAttribute('raycaster','objects','.clickable:not(.vr-btn)');
+ hL.addEventListener('controllerconnected',()=>setTimeout(()=>hL.setAttribute('raycaster',{enabled:false,showLine:false}),60));
+ hL.addEventListener('thumbstickmoved',e=>{ST.lx=e.detail.x;ST.ly=e.detail.y;});hR.addEventListener('thumbstickmoved',e=>{ST.rx=e.detail.x;ST.ry=e.detail.y;});sc.setAttribute('vr-loco','');
  hL.addEventListener('controllerconnected',()=>{VRUI.lConn=true;});
  hL.addEventListener('ybuttondown',()=>VRUI.on&&setOpen(!VRUI.open));hR.addEventListener('bbuttondown',()=>VRUI.on&&setOpen(!VRUI.open));hL.addEventListener('xbuttondown',()=>VRUI.on&&toggleInfo());
  VRUI.built=true;setTab(VRUI.tab);}
+const ST={lx:0,ly:0,rx:0,ry:0,lat:false};
+AFRAME.registerComponent('vr-loco',{init(){this.q=new TH.Quaternion();this.f=new TH.Vector3();this.p=new TH.Vector3();},tick(t,dt){if(!VRUI.on)return;dt=Math.min(dt,50)/1000;const o=rig.object3D;
+ if(Math.abs(ST.lx)>.15||Math.abs(ST.ly)>.15){cam.object3D.getWorldQuaternion(this.q);this.f.set(0,0,-1).applyQuaternion(this.q);this.f.y=0;this.f.normalize();const sp=14*dt;o.position.x+=(-this.f.x*ST.ly-this.f.z*ST.lx)*sp;o.position.z+=(-this.f.z*ST.ly+this.f.x*ST.lx)*sp;}
+ if(Math.abs(ST.ry)>.2)o.position.y+=ST.ry*6*dt;
+ if(Math.abs(ST.rx)>.7&&!ST.lat){ST.lat=true;const a=ST.rx>0?-Math.PI/6:Math.PI/6;cam.object3D.getWorldPosition(this.p);const dx=o.position.x-this.p.x,dz=o.position.z-this.p.z,c=Math.cos(a),n=Math.sin(a);o.position.x=this.p.x+dx*c+dz*n;o.position.z=this.p.z-dx*n+dz*c;o.rotation.y+=a;}
+ else if(Math.abs(ST.rx)<.3)ST.lat=false;}});
 window.vrUpdate=i=>{VRUI.i=i;paintAll(false);};
-function vrSet(on){const oc=cam.components['orbit-controls'];VRUI.on=on;
- if(on){if(!VRUI.built)build();cam.setAttribute('orbit-controls','enabled',false);cam.object3D.position.set(0,0,0);cam.object3D.rotation.set(0,0,0);rig.setAttribute('position','0 -8 24');rig.setAttribute('scale','10 10 10');
+function vrSet(on){const oc=cam.components['orbit-controls'];VRUI.on=on;ST.lx=ST.ly=ST.rx=ST.ry=0;
+ if(on){if(!VRUI.built)build();cam.setAttribute('orbit-controls','enabled',false);cam.object3D.position.set(0,0,0);cam.object3D.rotation.set(0,0,0);rig.setAttribute('position','0 -8 24');rig.setAttribute('scale','10 10 10');rig.object3D.rotation.set(0,0,0);
   setTimeout(()=>{if(VRUI.on&&!VRUI.lConn){hL.object3D.position.set(-.42,.95,-.5);hL.object3D.rotation.set(0,.4,0);}},2500);}
  else{rig.setAttribute('position','0 0 0');rig.setAttribute('scale','1 1 1');cam.setAttribute('orbit-controls','enabled',true);cam.object3D.position.set(0,25,25);if(oc&&oc.controls)oc.controls.update();}
  if(VRUI.built){vrRoot.object3D.visible=on&&VRUI.open;vrOrb.object3D.visible=on&&!VRUI.open;vrSb.object3D.visible=on&&VRUI.info;syncClickable();paintAll(true);}}
