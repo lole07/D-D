@@ -656,7 +656,7 @@ body:has(#adventure-ui:not(.hidden)) .forge-fab{display:none}
 <h3>❤️ Vidas</h3><p>Cada miniatura es una vida (corazones del HUD). Su barra de HP muestra su salud; el 🔰 escudo absorbe daño hasta tu próximo turno.</p>
 <h3>⭐ Puntos</h3><p>+1 por daño · +50 crítico (20 natural) · +100 por baja · +20 por curar · +50 por cofre · +100 por cada vida que conserves al ganar.</p>
 <h3>⏱️ Turnos</h3><p>En tu turno: 1 movimiento (🏃) y 1 acción. Un borde de color indica quién juega: azul héroes, rojo monstruos.</p>
-<h3>🥽 VR</h3><p>Pulsa 🥽 con tu visor: verás el tablero como una mesa. Apunta con el láser y dispara con el gatillo.</p>
+<h3>🥽 VR</h3><p>Pulsa 🥽 con tu visor: verás el tablero como una mesa. Tu mano izquierda lleva el menú (acciones, mesa, Master y sistema); minimízalo con — o con Y/B. Apunta con el láser derecho y dispara con el gatillo.</p>
 <p class="text-center mt-3 opacity-60 text-xs">Toca para cerrar</p></div></div>
 <button class="btn-gold forge-fab" onclick="forgeOpen()">🛠️ Forja de personajes</button>
 <div id="forge" class="hidden"><div class="fbar"><b>🛠️ Forja de personajes · crea, visualiza y usa tus héroes</b><button class="btn-gold" onclick="forgeUse()">✅ Usar en el juego</button><button class="btn-ghost" onclick="forgeClose()">✕</button></div><iframe id="forge-frame" title="Forja de personajes" allow="fullscreen"></iframe></div>
@@ -2584,7 +2584,7 @@ const lab=document.querySelector('#active-prop-indicator .uppercase');if(lab)lab
 </script>
 <script id="qol-js">
 (function(){
-state.score={party:0,dm:0};state.maxU={party:0,dm:0};let lastMsg='';
+state.score={party:0,dm:0};state.maxU={party:0,dm:0};let lastMsg='',msgAt=0;
 const rb=$('rail-body');
 ['shared-orientation','unit-actions-container','prop-actions-container'].forEach(i=>rb.appendChild($(i)));
 const del=document.querySelector('#left-content-ficha button[onclick="removeSelectedEntity()"]');
@@ -2606,7 +2606,7 @@ const _ats=applyTurnState;applyTurnState=function(){_ats();const cu=state.initia
 const _fc=finishCombat;finishCombat=async function(h){await _fc.call(this,h);const W=h?'party':'dm',alive=aliveUnits().filter(u=>factionOf(u)===W),
  hp=alive.reduce((s,u)=>s+u.hp,0),mx=alive.reduce((s,u)=>s+u.maxHp,0)||1,st=hp/mx>.7?3:hp/mx>.4?2:1,bonus=alive.length*100;addScore(W,bonus);
  $('result-stats').insertAdjacentHTML('beforeend',`<div class="res-stat"><span>Vidas restantes</span><b>${alive.length} (+${bonus})</b></div><div class="res-stat"><span>Puntos ${h?'Héroes':'Monstruos'}</span><b>${state.score[W]}</b></div><div class="res-stat"><span>Valoración</span><b>${'⭐'.repeat(st)}${'☆'.repeat(3-st)}</b></div>`);};
-const _asm=appendSystemMessage;appendSystemMessage=function(m){lastMsg=String(m).replace(/<[^>]*>/g,'');_asm(m);};
+const _asm=appendSystemMessage;appendSystemMessage=function(m){lastMsg=String(m).replace(/<[^>]*>/g,'');msgAt=Date.now();_asm(m);};
 /* HUD */
 let vrText=null;
 function hudTick(){
@@ -2623,30 +2623,107 @@ function hudTick(){
  $('m-score').textContent=pf==='both'?`${state.score.party} / ${state.score.dm}`:state.score[pf==='dm'?'dm':'party'];
  const cu=inC&&state.initiative[state.currentTurnIdx];
  $('vignette').style.setProperty('--vg',cu?(factionOf(cu)==='dm'?'rgba(239,68,68,.5)':'rgba(79,172,254,.45)'):'transparent');
- if(vrText){const s=state.selection&&state.selection.type==='board'&&!state.selection.entity.isProp?state.selection.entity:null;
-  vrText.setAttribute('value',`OBJETIVO: ${o.replace(/[⚔️]/gu,'')}\nVIDAS   Heroes x${H.length}/${mx.party}   Monstruos x${M.length}/${mx.dm}\nPUNTOS  Heroes ${state.score.party}   Monstruos ${state.score.dm}\n${$('turn-display').innerText}\n${s?s.name+'  HP '+s.hp+'/'+s.maxHp:'Apunta a una miniatura y gatillo'}\n${lastMsg.replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑ¡¿]/g,'').slice(0,70)}`);
-  const t=$('vr-turn');if(t)t.firstChild.setAttribute('value',inC?'Siguiente turno':'Combate');}
+ if(window.vrUpdate)vrUpdate({o,H,M,mx,inC});
 }
 setInterval(hudTick,300);
-/* VR */
-const sc=document.querySelector('a-scene'),cam=$('main-cam'),rig=$('vr-rig'),vr=[];
-function panel(pos,rot,w,h){const p=createEEl('a-entity',{position:pos,rotation:rot,visible:'false'});p.appendChild(createEEl('a-plane',{width:w,height:h,color:'#1d1209',material:'shader:flat;opacity:.92'}));sc.appendChild(p);vr.push(p);return p;}
-function btn(p,label,x,y,fn,id){const b=createEEl('a-plane',{width:3.7,height:1.9,position:`${x} ${y} 0.05`,color:'#6b4420',material:'shader:flat'});if(id)b.id=id;b.className='vr-btn';
- b.appendChild(createEEl('a-text',{value:label,align:'center',width:11,color:'#fff3cf',position:'0 0 0.02'}));
- b.addEventListener('click',fn);b.addEventListener('mouseenter',()=>b.setAttribute('color','#b27a2e'));b.addEventListener('mouseleave',()=>b.setAttribute('color','#6b4420'));p.appendChild(b);}
-const sb=panel('0 11 -22','0 0 0',26,8);vrText=createEEl('a-text',{value:'',align:'left',anchor:'left',baseline:'top',width:24,color:'#ffe9b0',position:'-12 3.5 0.05'});sb.appendChild(vrText);
-const ap=panel('0 4 19.5','-45 0 0',13,9.6),A=a=>()=>triggerAction(a);let vi=0;
+/* VR · menú de muñeca minimizable */
+const sc=document.querySelector('a-scene'),cam=$('main-cam'),rig=$('vr-rig'),hL=$('hand-l'),hR=$('hand-r'),TH=AFRAME.THREE;
+const PX=2400,AC='#5eead4',FONT="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Roboto,Arial,sans-serif";
+const VRUI={on:false,open:true,info:true,tab:'act',btns:[],dyn:[],lConn:false,built:false,i:null};
+let vrRoot,vrOrb,vrSb,encTex=TH.LinearEncoding,dmLast='',vi=0;
+const _adm=appendDMMessage;appendDMMessage=function(h){dmLast=lastMsg=String(h).replace(/<[^>]*>/g,'').replace(/&[#\w]+;/g,' ');msgAt=Date.now();_adm(h);};
+const _tst=toast;toast=function(i,t,d){lastMsg=((t||'')+(d?' · '+d:'')).trim();msgAt=Date.now();return _tst.apply(this,arguments);};
+AFRAME.registerComponent('vr-billboard',{init(){this.v=new TH.Vector3();},tick(){const o=this.el.object3D;if(!o.visible)return;cam.object3D.getWorldPosition(this.v);o.lookAt(this.v);}});
+const curSel=()=>{const s=state.selection;return s&&s.type==='board'&&s.entity&&!s.entity.isProp?s.entity:null;};
+const recent=()=>Date.now()-msgAt<9000&&lastMsg?lastMsg:'';
+const turnTxt=()=>{const t=$('turn-display');return t?t.innerText.replace(/\s+/g,' ').trim():'';};
+const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;};
+function rr(x,X,Y,W,H,r){x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+W,Y,X+W,Y+H,r);x.arcTo(X+W,Y+H,X,Y+H,r);x.arcTo(X,Y+H,X,Y,r);x.arcTo(X,Y,X+W,Y,r);x.closePath();}
+function fit(g,s,mw){s=String(s);if(g.measureText(s).width<=mw)return s;while(s.length>1&&g.measureText(s+'…').width>mw)s=s.slice(0,-1);return s+'…';}
+function shr(g,t,mw,fs,mn,wt){for(;fs>mn;fs-=2){g.font=`${wt} ${fs}px ${FONT}`;if(g.measureText(t).width<=mw)return fs;}g.font=`${wt} ${mn}px ${FONT}`;return mn;}
+function wrap(g,s,mw){const o=[];String(s).split('\n').forEach(p=>{let l='';p.split(' ').forEach(w=>{const t=l?l+' '+w:w;if(g.measureText(t).width>mw&&l){o.push(l);l=w;}else l=t;});o.push(l);});return o;}
+function widget(par,x,y,w,h,draw,sig,z,ro,ppm){const c=document.createElement('canvas');ppm=ppm||PX;c.width=Math.round(w*ppm);c.height=Math.round(h*ppm);
+ const t=new TH.CanvasTexture(c);t.minFilter=t.magFilter=TH.LinearFilter;t.generateMipmaps=false;t.encoding=encTex;
+ const el=createEEl('a-entity',{position:`${x} ${y} ${z==null?.004:z}`}),m=new TH.Mesh(new TH.PlaneGeometry(w,h),new TH.MeshBasicMaterial({map:t,transparent:true,depthWrite:false}));m.renderOrder=ro||30;el.setObject3D('mesh',m);par.appendChild(el);
+ const o={el,c,g:c.getContext('2d'),t,draw,sig:sig||(()=>''),last:null,tab:null};VRUI.dyn.push(o);return o;}
+function paint(o,f){const s=o.sig();if(!f&&s===o.last)return;o.last=s;o.g.clearRect(0,0,o.c.width,o.c.height);o.draw(o.g,o.c.width,o.c.height);o.t.needsUpdate=true;}
+const wantPaint=o=>o.sb?VRUI.info:o.orb?!VRUI.open:VRUI.open&&(o.tab==null||o.tab===VRUI.tab);
+function paintAll(f){if(VRUI.on)VRUI.dyn.forEach(o=>{if(wantPaint(o))paint(o,f);});}
+function buzz(e,i,d){try{const h=(e&&e.detail&&e.detail.cursorEl)||hR,gp=h.components['tracked-controls'].controller.gamepad,a=gp.hapticActuators[0];a.pulse(i,d);}catch(_){}}
+const say=m=>{lastMsg=m;msgAt=Date.now();};
+function drawBtn(g,W,H,s,st){const dis=s.dis&&s.dis(),act=s.act&&s.act(),col=s.col||AC,lab=typeof s.lab==='function'?s.lab():s.lab,ico=typeof s.ico==='function'?s.ico():s.ico;
+ rr(g,5,5,W-10,H-10,H*.2);
+ if(s.prim){const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,st.hot?'#ffe9a0':'#fcd34d');gr.addColorStop(1,st.hot?'#f59e0b':'#d97706');g.fillStyle=gr;}
+ else g.fillStyle=act?hexA(col,.4):st.hot?'rgba(40,96,114,.97)':'rgba(14,38,50,.92)';
+ g.globalAlpha=dis?.4:1;g.fill();g.lineWidth=st.hot?7:4;g.strokeStyle=s.prim?'#fff7d6':st.hot?'#fff':hexA(col,.85);g.stroke();
+ g.globalAlpha=dis?.5:1;g.textAlign='center';g.textBaseline='middle';
+ if(s.prim){g.fillStyle='#241603';shr(g,ico+'  '+lab,W-60,H*.46,20,800);g.fillText(ico+'  '+lab,W/2,H/2+3);}
+ else{g.fillStyle='#fff';g.font=`${H*.36}px ${FONT}`;g.fillText(ico,W/2,H*.38);g.fillStyle=act?'#fff':'#e2e8f0';shr(g,lab,W-18,H*.22,H*.13,700);g.fillText(lab,W/2,H*.8);
+  if(s.cost){g.textAlign='right';g.font=`700 ${H*.17}px ${FONT}`;g.fillStyle='#fde68a';g.fillText('⚡'+s.cost,W-14,H*.17);}}
+ g.globalAlpha=1;}
+function button(par,tab,s,x,y,w,h){const st={hot:false},sg=()=>[typeof s.lab==='function'?s.lab():s.lab,s.dis&&s.dis()?1:0,s.act&&s.act()?1:0,st.hot?1:0,s.sx?s.sx():''].join('|');
+ const o=widget(par,x,y,w,h,(g,W,H)=>s.draw?s.draw(g,W,H,st):drawBtn(g,W,H,s,st),sg,.006,40);o.tab=tab;o.el.className='vr-btn';VRUI.btns.push(o);
+ o.el.addEventListener('mouseenter',e=>{st.hot=true;o.el.object3D.scale.setScalar(1.06);o.el.object3D.position.z=.016;buzz(e,.25,25);paint(o);});
+ o.el.addEventListener('mouseleave',()=>{st.hot=false;o.el.object3D.scale.setScalar(1);o.el.object3D.position.z=.006;paint(o);});
+ o.el.addEventListener('click',e=>{if(s.dis&&s.dis()){buzz(e,.15,40);say(s.hint||'Primero apunta a una miniatura y pulsa el gatillo.');return;}buzz(e,.7,60);s.fn();setTimeout(()=>paint(o),150);});return o;}
+function syncClickable(){VRUI.btns.forEach(o=>o.el.classList.toggle('clickable',VRUI.on&&(o.orb?!VRUI.open:VRUI.open&&(o.tab==null||o.tab===VRUI.tab))));
+ [hR,hL,sc].forEach(e=>{const r=e.components&&e.components.raycaster;if(r&&r.refreshObjects)r.refreshObjects();});}
+function setOpen(v){VRUI.open=v;if(!VRUI.built)return;vrRoot.object3D.visible=VRUI.on&&v;vrOrb.object3D.visible=VRUI.on&&!v;syncClickable();paintAll(true);}
+function toggleInfo(){VRUI.info=!VRUI.info;if(VRUI.built)vrSb.object3D.visible=VRUI.on&&VRUI.info;paintAll(true);}
+const G={};function setTab(k){VRUI.tab=k;Object.keys(G).forEach(t=>G[t].object3D.visible=t===k);syncClickable();paintAll(true);}
+function nudge(d){const p=rig.getAttribute('position');rig.setAttribute('position',{x:p.x,y:p.y+d,z:p.z});}
 function summonNext(){const P=state.palette;if(!P.length)return;const picked=i=>P[i].role!=='Monstruo'&&Object.values(state.board).some(u=>!u.isProp&&u.paletteIdx===i);
  for(let k=0;k<P.length;k++){const i=(vi+k)%P.length;if(!picked(i)){vi=(i+1)%P.length;state.selection={type:'palette',card:P[i],idx:i};renderPalette();updateTutorialPhase();emit('palette_select');toast('🧙',P[i].name,'Apunta a una casilla y gatillo');return;}}
  toast('✅','Todo invocado','No quedan miniaturas.');}
-[['Mover',()=>toggleMoveMode()],['Atacar',A('ATACAR')],['Defender',A('DEFENDER')],['Curar',A('CURAR')],['Fuego',A('BOLA DE FUEGO')],['Hielo',A('CONGELAR')],
- ['D20 libre',A('ACCIÓN LIBRE')],['Girar',()=>rotateUnit(90)],['Cancelar',()=>clearSelection()],['Invocar',summonNext],['Combate',()=>state.currentTurnIdx===-1?startCombat():advanceTurn(),'vr-turn'],['Cofre',()=>openChest()]]
- .forEach((d,i)=>btn(ap,d[0],(i%3-1)*4,3.3-Math.floor(i/3)*2.2,d[1],d[2]));
-function vrSet(on){const oc=cam.components['orbit-controls'];
- if(on){cam.setAttribute('orbit-controls','enabled',false);cam.object3D.position.set(0,0,0);cam.object3D.rotation.set(0,0,0);rig.setAttribute('position','0 -8 24');rig.setAttribute('scale','10 10 10');}
+function build(){
+ try{encTex=sc.renderer&&sc.renderer.outputEncoding===TH.sRGBEncoding?TH.sRGBEncoding:TH.LinearEncoding;}catch(e){}
+ const W=.32,H=.394,noSel=()=>!curSel(),dis=id=>()=>{const b=$(id);return !b||b.disabled;},A=a=>()=>triggerAction(a);
+ vrRoot=createEEl('a-entity',{position:'0 .07 .02'});vrRoot.setAttribute('vr-billboard','');hL.appendChild(vrRoot);
+ widget(vrRoot,0,H/2,W,H,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(10,28,38,.92)');gr.addColorStop(1,'rgba(5,16,24,.92)');rr(g,4,4,w-8,h-8,48);g.fillStyle=gr;g.fill();g.lineWidth=6;g.strokeStyle='rgba(94,234,212,.6)';g.stroke();},null,0,20);
+ const status=()=>{const s=curSel(),inC=state.currentTurnIdx!==-1,u=state.initiative&&state.initiative[state.currentTurnIdx];return{s,inC,tn:u?u.name:'',r:recent()};};
+ widget(vrRoot,-.0295,.3585,.245,.055,(g,w,h)=>{const q=status(),s=q.s;rr(g,3,3,w-6,h-6,22);g.fillStyle='rgba(2,10,15,.8)';g.fill();g.lineWidth=3;g.strokeStyle='rgba(94,234,212,.3)';g.stroke();g.textBaseline='middle';g.textAlign='left';
+  if(s){const en=s.en==null?3:s.en;g.font=`800 38px ${FONT}`;g.fillStyle='#f8fafc';g.fillText(fit(g,(factionOf(s)==='dm'?'👹 ':'🛡️ ')+s.name,w*.5),16,34);g.textAlign='right';g.font=`700 32px ${FONT}`;g.fillStyle='#fda4af';g.fillText(`❤ ${s.hp}/${s.maxHp}`,w-120,34);g.fillStyle='#fde68a';g.fillText('⚡'+en,w-16,34);
+   const r=Math.max(0,Math.min(1,s.hp/s.maxHp));g.fillStyle='rgba(255,255,255,.14)';g.fillRect(16,58,w-32,9);g.fillStyle=r>.5?'#22c55e':r>.25?'#eab308':'#ef4444';g.fillRect(16,58,(w-32)*r,9);}
+  else{g.font=`800 36px ${FONT}`;g.fillStyle=AC;g.fillText(q.inC?'⚔️ Turno · '+q.tn:'🎲 Apunta a una miniatura',16,34);}
+  g.textAlign='left';g.font=`500 30px ${FONT}`;g.fillStyle='#cbd5e1';g.fillText(fit(g,q.r||(q.inC?'Turno · '+q.tn:(VRUI.i&&VRUI.i.o)||''),w-32),16,100);},
+  ()=>{const q=status(),s=q.s;return [s?s.name+s.hp+s.maxHp+s.en:'-',q.inC,q.tn,q.r,VRUI.i&&VRUI.i.o].join('|');});
+ button(vrRoot,null,{ico:'—',lab:'',draw:(g,w,h,st)=>{rr(g,3,3,w-6,h-6,22);g.fillStyle=st.hot?'rgba(94,234,212,.4)':'rgba(255,255,255,.08)';g.fill();g.lineWidth=4;g.strokeStyle=st.hot?'#fff':'rgba(94,234,212,.7)';g.stroke();g.fillStyle='#e2e8f0';g.textAlign='center';g.textBaseline='middle';g.font=`800 ${h*.5}px ${FONT}`;g.fillText('—',w/2,h/2);},fn:()=>setOpen(false)},.127,.3585,.05,.055);
+ const TABS=[['act','⚔️','Acción'],['mesa','🎲','Mesa'],['dm','💬','Master'],['sys','⚙️','Sistema']];
+ TABS.forEach(([k,ic,lb],i)=>button(vrRoot,null,{lab:lb,sx:()=>VRUI.tab,fn:()=>setTab(k),draw:(g,w,h,st)=>{const on=VRUI.tab===k;rr(g,3,3,w-6,h-6,h*.28);g.fillStyle=on?'rgba(94,234,212,.28)':st.hot?'rgba(255,255,255,.14)':'rgba(255,255,255,.05)';g.fill();g.lineWidth=3;g.strokeStyle=on?AC:'rgba(255,255,255,.2)';g.stroke();g.textAlign='center';g.textBaseline='middle';g.fillStyle=on?'#ecfeff':'#94a3b8';shr(g,ic+' '+lb,w-12,h*.34,16,700);g.fillText(ic+' '+lb,w/2,h/2+2);}},(i-1.5)*.0775,.302,.0715,.042));
+ const C={act:[
+  {ico:'🏃',lab:'Mover',col:'#4ade80',fn:()=>toggleMoveMode(),dis:dis('btn-move'),act:()=>$('btn-move')&&$('btn-move').classList.contains('move-active')},
+  {ico:'⚔️',lab:'Atacar',col:'#f87171',fn:A('ATACAR'),dis:dis('btn-atk')},{ico:'🛡️',lab:'Defender',col:'#60a5fa',fn:A('DEFENDER'),dis:dis('btn-def')},
+  {ico:'💖',lab:'Curar',col:'#34d399',fn:A('CURAR'),dis:dis('btn-heal'),cost:2},{ico:'🔥',lab:'Fuego',col:'#fb923c',fn:A('BOLA DE FUEGO'),dis:dis('btn-fire'),cost:2},{ico:'🧊',lab:'Hielo',col:'#38bdf8',fn:A('CONGELAR'),dis:dis('btn-ice'),cost:2},
+  {ico:'🎲',lab:'D20 libre',col:'#fbbf24',fn:A('ACCIÓN LIBRE'),dis:dis('btn-free')},{ico:'↷',lab:'Girar',fn:()=>rotateUnit(90),dis:noSel},{ico:'✖️',lab:'Cancelar',col:'#94a3b8',fn:()=>clearSelection()}],
+ mesa:[{ico:'🧙',lab:'Invocar',col:'#c084fc',fn:summonNext},{ico:'🗝️',lab:'Cofre',col:'#fbbf24',fn:()=>openChest()},{ico:'🗑️',lab:'Eliminar',col:'#f87171',fn:()=>removeSelectedEntity(),dis:()=>!state.selection||state.selection.type!=='board'},
+  {ico:'↶',lab:'Girar',fn:()=>rotateUnit(-90),dis:noSel},{ico:'🌲',lab:'Decorar',col:'#4ade80',fn:()=>randomizePropsOnBoard()},{ico:'🧹',lab:'Sin props',col:'#94a3b8',fn:()=>clearAllProps()},
+  {ico:'⬆️',lab:'Mesa arriba',fn:()=>nudge(-1)},{ico:'⬇️',lab:'Mesa abajo',fn:()=>nudge(1)},{ico:'🎯',lab:'Recentrar',fn:()=>rig.setAttribute('position','0 -8 24')}],
+ dm:[{ico:'🔍',lab:'Investigar',fn:()=>quickSay('Investigo la zona con cuidado.')},{ico:'💬',lab:'Hablar',fn:()=>quickSay('Intento hablar con la criatura más cercana.')},{ico:'🚪',lab:'Explorar',fn:()=>quickSay('Exploro hacia adelante buscando una salida.')}],
+ sys:[{ico:'🔊',lab:'Sonido',fn:()=>toggleMute()},{ico:'📊',lab:'Marcador',fn:toggleInfo,act:()=>VRUI.info},{ico:'🚪',lab:'Salir de VR',col:'#f87171',fn:()=>sc.exitVR()}]};
+ TABS.forEach(([k])=>{G[k]=createEEl('a-entity',{});vrRoot.appendChild(G[k]);C[k].forEach((s,i)=>button(G[k],k,s,(i%3-1)*.104,.242-Math.floor(i/3)*.07,.096,.062));});
+ const box=(k,txt)=>{const o=widget(G[k],0,.137,.304,.132,(g,w,h)=>{rr(g,3,3,w-6,h-6,26);g.fillStyle='rgba(2,10,15,.78)';g.fill();g.lineWidth=3;g.strokeStyle='rgba(94,234,212,.3)';g.stroke();g.font=`500 35px ${FONT}`;g.fillStyle='#e2e8f0';g.textAlign='left';g.textBaseline='top';
+  const L=wrap(g,txt(),w-44),mx=Math.floor((h-24)/46);L.slice(0,mx).forEach((l,i)=>g.fillText(i===mx-1&&L.length>mx?fit(g,l+' …',w-44):l,22,16+i*46));},()=>txt());o.tab=k;};
+ box('dm',()=>dmLast||'Pulsa una acción y el Master (IA) responderá aquí.');
+ box('sys',()=>'Y (izq.) o B (der.): abrir/cerrar este menú\nX (izq.): marcador de estado\nGatillo: elegir y confirmar\nApunta con el láser a una miniatura o casilla.');
+ button(vrRoot,null,{prim:true,ico:()=>state.currentTurnIdx===-1?'⚔️':'⏭️',lab:()=>state.currentTurnIdx===-1?'Combate':'Siguiente turno',fn:()=>state.currentTurnIdx===-1?startCombat():advanceTurn(),dis:()=>state.currentTurnIdx!==-1&&(state.aiBusy||state.busy),hint:'Espera: la IA está jugando su turno.'},0,.0355,.304,.055);
+ vrOrb=createEEl('a-entity',{position:'0 .075 .02'});vrOrb.setAttribute('vr-billboard','');hL.appendChild(vrOrb);
+ const oi=createEEl('a-entity',{animation:'property: scale; from: 1 1 1; to: 1.12 1.12 1.12; dir: alternate; dur: 900; loop: true; easing: easeInOutSine'});vrOrb.appendChild(oi);
+ const ob=button(oi,null,{ico:'',lab:'',fn:()=>setOpen(true),draw:(g,w,h,st)=>{const r=w/2-6,gr=g.createRadialGradient(w/2,h*.4,r*.1,w/2,h/2,r);gr.addColorStop(0,st.hot?'#99f6e4':'#2dd4bf');gr.addColorStop(1,'#0f766e');g.beginPath();g.arc(w/2,h/2,r,0,7);g.fillStyle=gr;g.fill();g.lineWidth=6;g.strokeStyle=st.hot?'#fff':'rgba(236,254,255,.85)';g.stroke();g.textAlign='center';g.textBaseline='middle';g.font=`${h*.46}px ${FONT}`;g.fillText('⚔️',w/2,h/2+4);}},0,0,.085,.085);ob.orb=true;
+ vrSb=createEEl('a-entity',{position:'0 0 0'});sc.appendChild(vrSb);
+ const sb=widget(vrSb,0,15,30,7,(g,w,h)=>{const i=VRUI.i||{H:[],M:[],mx:{party:0,dm:0}};rr(g,6,6,w-12,h-12,40);g.fillStyle='rgba(4,14,20,.8)';g.fill();g.lineWidth=6;g.strokeStyle='rgba(94,234,212,.55)';g.stroke();g.textAlign='center';g.textBaseline='middle';
+  g.font=`800 112px ${FONT}`;g.fillStyle='#f8fafc';g.fillText(fit(g,turnTxt(),w-140),w/2,h*.26);g.font=`700 82px ${FONT}`;g.fillStyle='#cbd5e1';g.fillText(`🛡️ Héroes ${i.H.length}/${i.mx.party}     👹 Monstruos ${i.M.length}/${i.mx.dm}     ⭐ ${state.score.party} · ${state.score.dm}`,w/2,h*.53);
+  g.font=`500 70px ${FONT}`;g.fillStyle='#94a3b8';g.fillText(fit(g,recent()||i.o||'',w-140),w/2,h*.79);},
+  ()=>{const i=VRUI.i||{};return [turnTxt(),i.H&&i.H.length,i.M&&i.M.length,i.mx&&i.mx.party,i.mx&&i.mx.dm,state.score.party,state.score.dm,recent(),i.o].join('|');},-26,20,80);sb.sb=true;
+ hL.setAttribute('raycaster','objects','.clickable:not(.vr-btn)');
+ hL.addEventListener('controllerconnected',()=>{VRUI.lConn=true;});
+ hL.addEventListener('ybuttondown',()=>VRUI.on&&setOpen(!VRUI.open));hR.addEventListener('bbuttondown',()=>VRUI.on&&setOpen(!VRUI.open));hL.addEventListener('xbuttondown',()=>VRUI.on&&toggleInfo());
+ VRUI.built=true;setTab(VRUI.tab);}
+window.vrUpdate=i=>{VRUI.i=i;paintAll(false);};
+function vrSet(on){const oc=cam.components['orbit-controls'];VRUI.on=on;
+ if(on){if(!VRUI.built)build();cam.setAttribute('orbit-controls','enabled',false);cam.object3D.position.set(0,0,0);cam.object3D.rotation.set(0,0,0);rig.setAttribute('position','0 -8 24');rig.setAttribute('scale','10 10 10');
+  setTimeout(()=>{if(VRUI.on&&!VRUI.lConn){hL.object3D.position.set(-.42,.95,-.5);hL.object3D.rotation.set(0,.4,0);}},2500);}
  else{rig.setAttribute('position','0 0 0');rig.setAttribute('scale','1 1 1');cam.setAttribute('orbit-controls','enabled',true);cam.object3D.position.set(0,25,25);if(oc&&oc.controls)oc.controls.update();}
- vr.forEach(p=>p.setAttribute('visible',on));document.querySelectorAll('.vr-btn').forEach(b=>b.classList.toggle('clickable',on));
- const r=sc.components.raycaster;if(r&&r.refreshObjects)r.refreshObjects();}
+ if(VRUI.built){vrRoot.object3D.visible=on&&VRUI.open;vrOrb.object3D.visible=on&&!VRUI.open;vrSb.object3D.visible=on&&VRUI.info;syncClickable();paintAll(true);}}
 sc.addEventListener('enter-vr',()=>vrSet(true));sc.addEventListener('exit-vr',()=>vrSet(false));
 window.enterVRSafe=()=>{if(!navigator.xr){toast('🥽','VR no disponible','Abre el juego desde el navegador de tu visor (Quest, etc.).','warn');return;}sc.enterVR().catch(()=>toast('🥽','No se pudo iniciar VR','Revisa los permisos del visor.','warn'));};
 })();
